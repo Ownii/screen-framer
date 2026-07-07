@@ -1,8 +1,8 @@
 # Screen Framer
 
 Menüleisten-App für macOS: spiegelt einen 16:9-Ausschnitt eines
-(Ultrawide-)Monitors live in ein normales Fenster, das sich in
-Microsoft Teams als Fenster teilen lässt.
+(Ultrawide-)Monitors live auf einen virtuellen Bildschirm „Screen Framer",
+der sich in Microsoft Teams als Bildschirm teilen lässt.
 
 ## Bauen
 
