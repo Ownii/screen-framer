@@ -8,6 +8,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     private let captureEngine = CaptureEngine()
     private let virtualDisplayController = VirtualDisplayController()
     private var mirrorWindowController: MirrorWindowController?
+    private var frameOverlayController: CropFrameOverlayController?
 
     /// Monitor, auf dessen Menüleiste zuletzt geklickt wurde (beim Menü-Öffnen ermittelt)
     private var clickedDisplayID: CGDirectDisplayID?
@@ -94,6 +95,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             Task { @MainActor in
                 do {
                     try await self.captureEngine.updatePosition(newPosition)
+                    self.showFrameOverlay(for: displayID)
                 } catch {
                     self.showError(error, title: "Positionswechsel fehlgeschlagen")
                 }
@@ -147,6 +149,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
                 self.activeDisplayID = displayID
                 self.isRunning = true
                 self.isStarting = false
+                self.showFrameOverlay(for: displayID)
             } catch {
                 self.isStarting = false
                 // Räumt einen ggf. schon erzeugten virtuellen Bildschirm ab
@@ -167,6 +170,19 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         return CGSize(width: crop.width * scale, height: crop.height * scale)
     }
 
+    /// Zeigt den Rahmen um den aktuellen Ausschnitt bzw. verschiebt ihn.
+    private func showFrameOverlay(for displayID: CGDirectDisplayID) {
+        guard let screen = NSScreen.screens.first(where: { $0.displayID == displayID })
+        else { return }
+        let crop = CropCalculator.cropRect(
+            displaySize: screen.frame.size, position: position)
+        if let overlay = frameOverlayController {
+            overlay.move(to: crop, on: screen)
+        } else {
+            frameOverlayController = CropFrameOverlayController(cropRect: crop, on: screen)
+        }
+    }
+
     @objc private func stopCapture() {
         Task { @MainActor in await self.teardown() }
     }
@@ -180,6 +196,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         }
         mirrorWindowController?.close()
         mirrorWindowController = nil
+        frameOverlayController?.close()
+        frameOverlayController = nil
         virtualDisplayController.destroy()
     }
 
