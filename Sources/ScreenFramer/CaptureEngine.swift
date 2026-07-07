@@ -27,6 +27,11 @@ final class CaptureEngine: NSObject {
     private let sampleQueue = DispatchQueue(label: "de.martinfoerster.screen-framer.capture")
 
     func start(displayID: CGDirectDisplayID, position: CropPosition) async throws {
+        // Bereits laufenden Stream sauber beenden, bevor ein neuer startet
+        if stream != nil {
+            await stop()
+        }
+
         let content = try await SCShareableContent.excludingDesktopWindows(
             false, onScreenWindowsOnly: true)
         guard let display = content.displays.first(where: { $0.displayID == displayID }) else {
@@ -104,7 +109,7 @@ extension CaptureEngine: SCStreamOutput {
 extension CaptureEngine: SCStreamDelegate {
     func stream(_ stream: SCStream, didStopWithError error: Error) {
         DispatchQueue.main.async { [weak self] in
-            guard let self, self.stream != nil else { return }
+            guard let self, self.stream === stream else { return }
             self.stream = nil
             self.configuration = nil
             self.onStopped?(error)
