@@ -37,10 +37,15 @@ cat > "$APP/Contents/Info.plist" <<'EOF'
 </plist>
 EOF
 
-# Ad-hoc-Signatur mit stabiler Bundle-ID: hilft macOS, die Bildschirm-
-# aufnahme-Berechtigung der App zuzuordnen. Hinweis: Da die Ad-hoc-Signatur
-# pro Build wechselt, kann macOS nach einem Rebuild verlangen, die
-# Berechtigung in den Systemeinstellungen erneut zu aktivieren.
-codesign --force --sign - "$APP"
+# Signatur mit stabiler Identität: Die TCC-Berechtigung (Bildschirmaufnahme)
+# ist an die Code-Signatur gebunden. Mit einem echten Entwicklerzertifikat
+# bleibt sie über Rebuilds erhalten — mit Ad-hoc-Signatur ("-") müsste sie
+# nach jedem Rebuild neu erteilt werden. Fallback auf Ad-hoc, falls kein
+# Zertifikat vorhanden ist (überschreibbar via SCREEN_FRAMER_SIGN_IDENTITY).
+DEFAULT_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null \
+    | grep -m1 "Apple Development" | awk '{print $2}' || true)
+SIGN_IDENTITY="${SCREEN_FRAMER_SIGN_IDENTITY:-${DEFAULT_IDENTITY:--}}"
+echo "Signiere mit: $SIGN_IDENTITY"
+codesign --force --sign "$SIGN_IDENTITY" "$APP"
 
 echo "Fertig: $APP"

@@ -20,8 +20,9 @@ open "build/Screen Framer.app"
    ein weiterer Klick schaltet die Position live um, ein Klick auf dem anderen
    Monitor wechselt die Übertragung dorthin
 3. Beim ersten Mal fragt macOS nach der Berechtigung „Bildschirmaufnahme"
-   (danach App neu starten) — nach einem Rebuild muss die Berechtigung
-   ggf. erneut aktiviert werden
+   (danach App neu starten). Das Build-Skript signiert mit dem Apple-
+   Development-Zertifikat aus dem Schlüsselbund, damit die Berechtigung
+   Rebuilds übersteht (Fallback: Ad-hoc — dann nach jedem Rebuild neu erteilen)
 4. In Teams **Bildschirm teilen** → „Screen Framer"
 
 **Übertragung stoppen** im Menü beendet die Übertragung und entfernt den
