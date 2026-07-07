@@ -62,7 +62,7 @@ Beispiele: 5120×1440 (32:9) → 2560×1440; 2560×1080 (21:9) → 1920×1080.
   Ausschnitts (cropRect × backingScaleFactor der Quelle), 60 Hz, ohne HiDPI.
   Wird bei Übertragungsstart erzeugt und bei Stopp zerstört. Nach der
   Erzeugung wird auf die `NSScreen`-Registrierung gewartet
-  (`didChangeScreenParametersNotification` + 2 s Timeout).
+  (Polling, max. 2 s).
 - **Rendering:** randloses Vollbild-Fenster auf dem virtuellen Bildschirm,
   Frames über `AVSampleBufferDisplayLayer` (latenzarm, GPU-basiert).
 - **Packaging:** Swift Package (SPM) + Build-Skript, das ein echtes
