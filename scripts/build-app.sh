@@ -37,8 +37,10 @@ cat > "$APP/Contents/Info.plist" <<'EOF'
 </plist>
 EOF
 
-# Ad-hoc-Signatur: nötig, damit macOS die Bildschirmaufnahme-Berechtigung
-# der App über Rebuilds hinweg zuordnen kann.
+# Ad-hoc-Signatur mit stabiler Bundle-ID: hilft macOS, die Bildschirm-
+# aufnahme-Berechtigung der App zuzuordnen. Hinweis: Da die Ad-hoc-Signatur
+# pro Build wechselt, kann macOS nach einem Rebuild verlangen, die
+# Berechtigung in den Systemeinstellungen erneut zu aktivieren.
 codesign --force --sign - "$APP"
 
 echo "Fertig: $APP"

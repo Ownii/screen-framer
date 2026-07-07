@@ -11,6 +11,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     private var selectedDisplayID: CGDirectDisplayID?
     private var position: CropPosition = .center
     private var isRunning = false
+    private var isStarting = false
 
     private static let positionTitles: [(CropPosition, String)] = [
         (.left, "Links"), (.center, "Mitte"), (.right, "Rechts"),
@@ -72,7 +73,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
                 title: "Übertragung starten", action: #selector(startCapture),
                 keyEquivalent: "")
             // Ohne Monitorauswahl kein Start (target = nil → Item ausgegraut)
-            startItem.target = (selectedDisplayID != nil) ? self : nil
+            startItem.target = (selectedDisplayID != nil && !isStarting) ? self : nil
             menu.addItem(startItem)
         }
 
@@ -113,7 +114,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     }
 
     @objc private func startCapture() {
-        guard let displayID = selectedDisplayID, !isRunning else { return }
+        guard let displayID = selectedDisplayID, !isRunning, !isStarting else { return }
         guard CGPreflightScreenCaptureAccess() else {
             CGRequestScreenCaptureAccess()
             showPermissionAlert()
@@ -136,14 +137,17 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             }
         }
 
+        isStarting = true
         Task { @MainActor in
             do {
                 try await self.captureEngine.start(displayID: displayID, position: self.position)
                 self.mirrorWindowController = windowController
                 self.isRunning = true
+                self.isStarting = false
                 windowController.showWindow(nil)
                 NSApp.activate(ignoringOtherApps: true)
             } catch {
+                self.isStarting = false
                 self.showError(error)
             }
         }
