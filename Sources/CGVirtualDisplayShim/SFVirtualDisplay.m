@@ -34,6 +34,7 @@
 @end
 
 @implementation SFVirtualDisplay {
+    // Stark referenziert; ARC-Freigabe in dealloc entfernt den virtuellen Bildschirm.
     SFCGVirtualDisplay *_display;
 }
 
@@ -76,6 +77,9 @@
         (SFCGVirtualDisplayMode *)[[modeClass alloc] initWithWidth:pixelWidth
                                                             height:pixelHeight
                                                        refreshRate:60.0];
+    if (!mode) {
+        return nil;
+    }
     SFCGVirtualDisplaySettings *settings =
         (SFCGVirtualDisplaySettings *)[[settingsClass alloc] init];
     settings.hiDPI = 0;
