@@ -2,10 +2,11 @@ import AppKit
 import ScreenFramerCore
 
 /// Menüleisten-Icon und Menü; hält den App-Zustand und verdrahtet
-/// CaptureEngine und MirrorWindowController.
+/// VirtualDisplayController, CaptureEngine und MirrorWindowController.
 final class StatusBarController: NSObject, NSMenuDelegate {
     private let statusItem: NSStatusItem
     private let captureEngine = CaptureEngine()
+    private let virtualDisplayController = VirtualDisplayController()
     private var mirrorWindowController: MirrorWindowController?
 
     /// Monitor, auf dessen Menüleiste zuletzt geklickt wurde (beim Menü-Öffnen ermittelt)
@@ -38,9 +39,12 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
         let clickedScreen = statusItem.button?.window?.screen ?? NSScreen.main
         clickedDisplayID = clickedScreen?.displayID
+        // Der virtuelle Bildschirm ist nie Capture-Quelle (Endlosschleife)
+        let clickedIsVirtual =
+            clickedDisplayID != nil
+            && clickedDisplayID == virtualDisplayController.displayID
 
         if let clickedScreen {
-            // Deaktivierter Info-Eintrag: zeigt, welcher Monitor übertragen würde
             let infoItem = NSMenuItem(
                 title: "Monitor: \(clickedScreen.localizedName)", action: nil,
                 keyEquivalent: "")
@@ -51,7 +55,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         for (value, title) in Self.positionTitles {
             let item = NSMenuItem(
                 title: title, action: #selector(startTransmission(_:)), keyEquivalent: "")
-            item.target = (clickedDisplayID != nil && !isStarting) ? self : nil
+            item.target =
+                (clickedDisplayID != nil && !clickedIsVirtual && !isStarting) ? self : nil
             item.representedObject = value.rawValue
             item.state = (isRunning && value == position) ? .on : .off
             menu.addItem(item)
@@ -80,6 +85,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         guard let raw = sender.representedObject as? String,
               let newPosition = CropPosition(rawValue: raw),
               let displayID = clickedDisplayID,
+              displayID != virtualDisplayController.displayID,
               !isStarting else { return }
 
         if isRunning, displayID == activeDisplayID {
@@ -106,6 +112,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             showPermissionAlert()
             return
         }
+        guard let pixelSize = cropPixelSize(for: displayID) else { return }
 
         isStarting = true
         Task { @MainActor in
@@ -114,35 +121,45 @@ final class StatusBarController: NSObject, NSMenuDelegate {
                 await self.teardown()
             }
 
-            let windowController = MirrorWindowController()
-            windowController.onClose = { [weak self] in
-                guard let self, self.isRunning else { return }
-                Task { @MainActor in await self.teardown(closeWindow: false) }
-            }
-            self.captureEngine.onFrame = { [weak windowController] buffer in
-                windowController?.enqueue(buffer)
-            }
-            self.captureEngine.onStopped = { [weak self] error in
-                guard let self else { return }
-                Task { @MainActor in
-                    await self.teardown(stopEngine: false)
-                    if let error { self.showError(error) }
-                }
-            }
-
             do {
-                try await self.captureEngine.start(displayID: displayID, position: self.position)
+                let screen = try await self.virtualDisplayController.create(
+                    name: "Screen Framer", pixelSize: pixelSize)
+                let windowController = MirrorWindowController(screen: screen)
+                self.captureEngine.onFrame = { [weak windowController] buffer in
+                    windowController?.enqueue(buffer)
+                }
+                self.captureEngine.onStopped = { [weak self] error in
+                    guard let self else { return }
+                    Task { @MainActor in
+                        await self.teardown(stopEngine: false)
+                        if let error { self.showError(error) }
+                    }
+                }
+                try await self.captureEngine.start(
+                    displayID: displayID, position: self.position)
+                windowController.window?.orderFrontRegardless()
                 self.mirrorWindowController = windowController
                 self.activeDisplayID = displayID
                 self.isRunning = true
                 self.isStarting = false
-                windowController.showWindow(nil)
-                NSApp.activate(ignoringOtherApps: true)
             } catch {
                 self.isStarting = false
+                // Räumt einen ggf. schon erzeugten virtuellen Bildschirm ab
+                await self.teardown()
                 self.showError(error)
             }
         }
+    }
+
+    /// Pixelgröße des 16:9-Ausschnitts = Auflösung des virtuellen Bildschirms.
+    /// (Unabhängig von der Position — Breite/Höhe sind für alle Anker gleich.)
+    private func cropPixelSize(for displayID: CGDirectDisplayID) -> CGSize? {
+        guard let screen = NSScreen.screens.first(where: { $0.displayID == displayID })
+        else { return nil }
+        let crop = CropCalculator.cropRect(
+            displaySize: screen.frame.size, position: position)
+        let scale = screen.backingScaleFactor
+        return CGSize(width: crop.width * scale, height: crop.height * scale)
     }
 
     @objc private func stopCapture() {
@@ -150,17 +167,15 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     }
 
     @MainActor
-    private func teardown(stopEngine: Bool = true, closeWindow: Bool = true) async {
+    private func teardown(stopEngine: Bool = true) async {
         isRunning = false
         activeDisplayID = nil
         if stopEngine {
             await captureEngine.stop()
         }
-        if closeWindow, let controller = mirrorWindowController {
-            controller.onClose = nil
-            controller.close()
-        }
+        mirrorWindowController?.close()
         mirrorWindowController = nil
+        virtualDisplayController.destroy()
     }
 
     private func showPermissionAlert() {

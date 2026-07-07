@@ -1,25 +1,22 @@
 import AppKit
 import AVFoundation
 
-/// Das Fenster, das in Teams geteilt wird: frei skalierbar,
-/// Seitenverhältnis fest 16:9, rendert CMSampleBuffer via
-/// AVSampleBufferDisplayLayer (GPU-basiert, latenzarm).
-final class MirrorWindowController: NSWindowController, NSWindowDelegate {
-    var onClose: (() -> Void)?
-
+/// Randloses Vollbild-Fenster auf dem virtuellen Bildschirm; rendert
+/// CMSampleBuffer via AVSampleBufferDisplayLayer (GPU-basiert, latenzarm).
+final class MirrorWindowController: NSWindowController {
     private let displayLayer = AVSampleBufferDisplayLayer()
 
-    init() {
+    init(screen: NSScreen) {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 960, height: 540),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            contentRect: screen.frame,
+            styleMask: [.borderless],
             backing: .buffered,
             defer: false)
-        window.title = "Screen Framer"
-        window.contentAspectRatio = NSSize(width: 16, height: 9)
+        window.level = .normal
         window.isReleasedWhenClosed = false
+        window.backgroundColor = .black
+        window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
         super.init(window: window)
-        window.delegate = self
 
         displayLayer.videoGravity = .resizeAspect
         displayLayer.backgroundColor = NSColor.black.cgColor
@@ -27,7 +24,7 @@ final class MirrorWindowController: NSWindowController, NSWindowDelegate {
         contentView.layer = displayLayer
         contentView.wantsLayer = true
         window.contentView = contentView
-        window.center()
+        window.setFrame(screen.frame, display: true)
     }
 
     @available(*, unavailable)
@@ -39,9 +36,5 @@ final class MirrorWindowController: NSWindowController, NSWindowDelegate {
             renderer.flush()
         }
         renderer.enqueue(sampleBuffer)
-    }
-
-    func windowWillClose(_ notification: Notification) {
-        onClose?()
     }
 }
