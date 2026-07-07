@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:screen-framer}",
+            "name": "Debug ScreenFramer",
+            "target": "ScreenFramer",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug ScreenFramer"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:screen-framer}",
+            "name": "Release ScreenFramer",
+            "target": "ScreenFramer",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release ScreenFramer"
+        }
+    ]
+}
