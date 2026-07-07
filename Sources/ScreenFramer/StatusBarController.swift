@@ -95,7 +95,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
                 do {
                     try await self.captureEngine.updatePosition(newPosition)
                 } catch {
-                    self.showError(error)
+                    self.showError(error, title: "Positionswechsel fehlgeschlagen")
                 }
             }
             return
@@ -112,7 +112,12 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             showPermissionAlert()
             return
         }
-        guard let pixelSize = cropPixelSize(for: displayID) else { return }
+        guard let pixelSize = cropPixelSize(for: displayID) else {
+            showError(
+                CaptureError.displayNotFound,
+                title: "Übertragung konnte nicht gestartet werden")
+            return
+        }
 
         isStarting = true
         Task { @MainActor in
@@ -146,7 +151,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
                 self.isStarting = false
                 // Räumt einen ggf. schon erzeugten virtuellen Bildschirm ab
                 await self.teardown()
-                self.showError(error)
+                self.showError(error, title: "Übertragung konnte nicht gestartet werden")
             }
         }
     }
@@ -197,9 +202,9 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         }
     }
 
-    private func showError(_ error: Error) {
+    private func showError(_ error: Error, title: String = "Übertragung beendet") {
         let alert = NSAlert()
-        alert.messageText = "Übertragung beendet"
+        alert.messageText = title
         alert.informativeText = error.localizedDescription
         NSApp.activate(ignoringOtherApps: true)
         alert.runModal()

@@ -12,7 +12,9 @@ final class MirrorWindowController: NSWindowController {
             styleMask: [.borderless],
             backing: .buffered,
             defer: false)
-        window.level = .normal
+        // Über der Menüleiste des virtuellen Bildschirms, sonst überdeckt
+        // sie den oberen Rand des übertragenen Bildes
+        window.level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 1)
         window.isReleasedWhenClosed = false
         window.backgroundColor = .black
         window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]

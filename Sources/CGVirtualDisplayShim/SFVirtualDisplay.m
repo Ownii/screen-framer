@@ -54,43 +54,50 @@
         return nil;
     }
 
-    SFCGVirtualDisplayDescriptor *descriptor =
-        (SFCGVirtualDisplayDescriptor *)[[descriptorClass alloc] init];
-    descriptor.name = name;
-    descriptor.maxPixelsWide = (unsigned int)pixelWidth;
-    descriptor.maxPixelsHigh = (unsigned int)pixelHeight;
-    // Physische Größe nur für die Monitor-Metadaten (~92 dpi)
-    descriptor.sizeInMillimeters =
-        CGSizeMake(pixelWidth * 25.4 / 92.0, pixelHeight * 25.4 / 92.0);
-    descriptor.productID = 0x5346;
-    descriptor.vendorID = 0x5346;
-    descriptor.serialNum = 1;
-    descriptor.queue = dispatch_get_main_queue();
+    @try {
+        SFCGVirtualDisplayDescriptor *descriptor =
+            (SFCGVirtualDisplayDescriptor *)[[descriptorClass alloc] init];
+        descriptor.name = name;
+        descriptor.maxPixelsWide = (unsigned int)pixelWidth;
+        descriptor.maxPixelsHigh = (unsigned int)pixelHeight;
+        // Physische Größe nur für die Monitor-Metadaten (~92 dpi)
+        descriptor.sizeInMillimeters =
+            CGSizeMake(pixelWidth * 25.4 / 92.0, pixelHeight * 25.4 / 92.0);
+        descriptor.productID = 0x5346;
+        descriptor.vendorID = 0x5346;
+        descriptor.serialNum = 1;
+        descriptor.queue = dispatch_get_main_queue();
 
-    SFCGVirtualDisplay *display =
-        (SFCGVirtualDisplay *)[[displayClass alloc] initWithDescriptor:descriptor];
-    if (!display) {
+        SFCGVirtualDisplay *display =
+            (SFCGVirtualDisplay *)[[displayClass alloc] initWithDescriptor:descriptor];
+        if (!display) {
+            return nil;
+        }
+
+        SFCGVirtualDisplayMode *mode =
+            (SFCGVirtualDisplayMode *)[[modeClass alloc] initWithWidth:pixelWidth
+                                                                height:pixelHeight
+                                                           refreshRate:60.0];
+        if (!mode) {
+            return nil;
+        }
+        SFCGVirtualDisplaySettings *settings =
+            (SFCGVirtualDisplaySettings *)[[settingsClass alloc] init];
+        if (!settings) {
+            return nil;
+        }
+        settings.hiDPI = 0;
+        settings.modes = @[ mode ];
+        if (![display applySettings:settings]) {
+            return nil;
+        }
+
+        _display = display;
+        _displayID = display.displayID;
+        return self;
+    } @catch (NSException *exception) {
         return nil;
     }
-
-    SFCGVirtualDisplayMode *mode =
-        (SFCGVirtualDisplayMode *)[[modeClass alloc] initWithWidth:pixelWidth
-                                                            height:pixelHeight
-                                                       refreshRate:60.0];
-    if (!mode) {
-        return nil;
-    }
-    SFCGVirtualDisplaySettings *settings =
-        (SFCGVirtualDisplaySettings *)[[settingsClass alloc] init];
-    settings.hiDPI = 0;
-    settings.modes = @[ mode ];
-    if (![display applySettings:settings]) {
-        return nil;
-    }
-
-    _display = display;
-    _displayID = display.displayID;
-    return self;
 }
 
 @end

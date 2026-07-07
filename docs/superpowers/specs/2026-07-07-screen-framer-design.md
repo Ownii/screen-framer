@@ -106,6 +106,9 @@ Beispiele: 5120×1440 (32:9) → 2560×1440; 2560×1080 (21:9) → 1920×1080.
   Apps können kurz zucken).
 - Der Mauszeiger kann auf den virtuellen Bildschirm wandern — in v1 bewusst
   nicht mitigiert.
+- Ein Monitorwechsel während laufender Übertragung erzeugt den virtuellen
+  Bildschirm neu — eine laufende Teams-Freigabe endet dadurch und muss neu
+  gestartet werden.
 
 ## Tests
 
