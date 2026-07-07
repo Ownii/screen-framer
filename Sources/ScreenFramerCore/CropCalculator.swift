@@ -21,4 +21,15 @@ public enum CropCalculator {
         }
         return CGRect(x: x, y: 0, width: targetWidth, height: displaySize.height)
     }
+
+    /// Rechnet ein display-lokales Rechteck (Ursprung oben links, wie
+    /// `cropRect`) in ein globales Cocoa-Frame (Ursprung unten links) um.
+    /// `screenFrame` ist das globale Frame des Monitors (`NSScreen.frame`).
+    public static func cocoaFrame(for cropRect: CGRect, in screenFrame: CGRect) -> CGRect {
+        CGRect(
+            x: screenFrame.origin.x + cropRect.origin.x,
+            y: screenFrame.origin.y + screenFrame.height - cropRect.maxY,
+            width: cropRect.width,
+            height: cropRect.height)
+    }
 }

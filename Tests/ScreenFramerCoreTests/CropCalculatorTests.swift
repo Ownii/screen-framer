@@ -42,4 +42,30 @@ final class CropCalculatorTests: XCTestCase {
             displaySize: CGSize(width: 1024, height: 1440), position: .right)
         XCTAssertEqual(rect, CGRect(x: 0, y: 0, width: 1024, height: 1440))
     }
+
+    // MARK: - cocoaFrame(for:in:)
+
+    // Monitor am globalen Ursprung, Ausschnitt volle Höhe → identische Werte
+    func testCocoaFrameFullHeightAtOrigin() {
+        let frame = CropCalculator.cocoaFrame(
+            for: CGRect(x: 1280, y: 0, width: 2560, height: 1440),
+            in: CGRect(x: 0, y: 0, width: 5120, height: 1440))
+        XCTAssertEqual(frame, CGRect(x: 1280, y: 0, width: 2560, height: 1440))
+    }
+
+    // Monitor mit globalem Offset (z. B. zweiter Monitor im Arrangement)
+    func testCocoaFrameWithScreenOffset() {
+        let frame = CropCalculator.cocoaFrame(
+            for: CGRect(x: 0, y: 0, width: 1920, height: 1080),
+            in: CGRect(x: 100, y: 50, width: 2560, height: 1080))
+        XCTAssertEqual(frame, CGRect(x: 100, y: 50, width: 1920, height: 1080))
+    }
+
+    // Teilhöhe: beweist die y-Spiegelung (oben-links → unten-links)
+    func testCocoaFrameFlipsYForPartialHeight() {
+        let frame = CropCalculator.cocoaFrame(
+            for: CGRect(x: 0, y: 100, width: 800, height: 450),
+            in: CGRect(x: 0, y: 0, width: 1000, height: 1000))
+        XCTAssertEqual(frame, CGRect(x: 0, y: 450, width: 800, height: 450))
+    }
 }
