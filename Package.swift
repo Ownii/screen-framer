@@ -6,9 +6,10 @@ let package = Package(
     platforms: [.macOS(.v14)],
     targets: [
         .target(name: "ScreenFramerCore"),
+        .target(name: "CGVirtualDisplayShim"),
         .executableTarget(
             name: "ScreenFramer",
-            dependencies: ["ScreenFramerCore"]
+            dependencies: ["ScreenFramerCore", "CGVirtualDisplayShim"]
         ),
         .testTarget(
             name: "ScreenFramerCoreTests",
