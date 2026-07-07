@@ -29,6 +29,11 @@ wird in Teams als **Bildschirm** geteilt (nicht als Fenster).
 - **Selbst-Capture-Schutz:** Wird das Menü auf dem virtuellen Bildschirm
   selbst geöffnet (auch der hat eine Menüleiste), sind die Positionen
   deaktiviert — der virtuelle Bildschirm ist nie Capture-Quelle.
+- **Rahmen um den Ausschnitt:** Solange die Übertragung läuft, markiert ein
+  grüner Rahmen (4 pt, `systemGreen`) auf dem Quellmonitor den übertragenen
+  16:9-Bereich; er wandert beim Positionswechsel mit und verschwindet bei
+  Stopp. Nur lokal sichtbar — die eigenen Fenster der App sind vom Capture
+  ausgeschlossen, Teilnehmende sehen ihn nicht.
 - **Übertragung stoppen** (nur sichtbar, während die Übertragung läuft).
   Gestoppt wird ausschließlich über das Menü oder durch Stream-Fehler; ein
   schließbares Fenster gibt es nicht mehr.
@@ -65,6 +70,13 @@ Beispiele: 5120×1440 (32:9) → 2560×1440; 2560×1080 (21:9) → 1920×1080.
   (Polling, max. 2 s).
 - **Rendering:** randloses Vollbild-Fenster auf dem virtuellen Bildschirm,
   Frames über `AVSampleBufferDisplayLayer` (latenzarm, GPU-basiert).
+- **Rahmen-Overlay:** randloses, transparentes, klick-durchlässiges Fenster
+  (`ignoresMouseEvents = true`) auf dem Quellmonitor, nur Rand gezeichnet
+  (CALayer-Border), kein Schatten, Level über der Menüleiste,
+  `canJoinAllSpaces` + `stationary`. Koordinaten-Umrechnung (display-lokales
+  Top-Left-Rechteck → globales Cocoa-Bottom-Left-Frame) als reine,
+  unit-getestete Funktion `CropCalculator.cocoaFrame(for:in:)` in
+  `ScreenFramerCore`.
 - **Packaging:** Swift Package (SPM) + Build-Skript, das ein echtes
   `Screen Framer.app`-Bundle mit Info.plist und stabiler Bundle-ID erzeugt —
   nötig, damit macOS die Bildschirmaufnahme-Berechtigung (TCC) der App
@@ -85,6 +97,9 @@ Beispiele: 5120×1440 (32:9) → 2560×1440; 2560×1080 (21:9) → 1920×1080.
   wartet auf den zugehörigen `NSScreen`, meldet Fehler als `LocalizedError`.
 - **MirrorWindow** — randloses Vollbild-Fenster auf dem virtuellen Bildschirm
   inkl. Display-Layer; nimmt `CMSampleBuffer` entgegen und zeigt sie an.
+- **CropFrameOverlayController** — der grüne Rahmen auf dem Quellmonitor;
+  wird bei Start gezeigt, bei Positionswechsel verschoben, bei Stopp
+  entfernt.
 - **CropCalculator** — reine Funktion: (Monitorgröße, Position) → Ausschnitts-
   Rechteck. Unit-getestet.
 
@@ -113,7 +128,8 @@ Beispiele: 5120×1440 (32:9) → 2560×1440; 2560×1080 (21:9) → 1920×1080.
 ## Tests
 
 - `CropCalculator` mit Unit-Tests (32:9, 21:9, 16:9, schmaler als 16:9; alle
-  drei Positionen).
+  drei Positionen; Koordinaten-Umrechnung `cocoaFrame(for:in:)` inkl.
+  Monitor-Offset und y-Spiegelung).
 - Capture und UI: manuelle Verifikation durch Starten der App.
 
 ## Bewusst außen vor (YAGNI)
