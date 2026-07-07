@@ -19,7 +19,9 @@ final class CropFrameOverlayController: NSWindowController {
         window.isReleasedWhenClosed = false
         // Über der Menüleiste, damit der Rahmen oben durchgängig sichtbar ist
         window.level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 1)
-        window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
+        window.collectionBehavior = [
+            .canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary,
+        ]
         super.init(window: window)
 
         let view = NSView()

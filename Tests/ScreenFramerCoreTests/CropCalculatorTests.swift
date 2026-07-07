@@ -61,6 +61,14 @@ final class CropCalculatorTests: XCTestCase {
         XCTAssertEqual(frame, CGRect(x: 100, y: 50, width: 1920, height: 1080))
     }
 
+    // Monitor links unterhalb des Hauptmonitors (negativer globaler Ursprung)
+    func testCocoaFrameWithNegativeScreenOrigin() {
+        let frame = CropCalculator.cocoaFrame(
+            for: CGRect(x: 0, y: 0, width: 1920, height: 1080),
+            in: CGRect(x: -1920, y: -280, width: 1920, height: 1080))
+        XCTAssertEqual(frame, CGRect(x: -1920, y: -280, width: 1920, height: 1080))
+    }
+
     // Teilhöhe: beweist die y-Spiegelung (oben-links → unten-links)
     func testCocoaFrameFlipsYForPartialHeight() {
         let frame = CropCalculator.cocoaFrame(

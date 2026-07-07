@@ -91,12 +91,17 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
         if isRunning, displayID == activeDisplayID {
             guard newPosition != position else { return }
+            let previousPosition = position
             position = newPosition
             Task { @MainActor in
                 do {
                     try await self.captureEngine.updatePosition(newPosition)
+                    // Zwischenzeitliches Teardown (z. B. Stream-Fehler): kein
+                    // Overlay für eine beendete Übertragung wiederbeleben
+                    guard self.isRunning, self.activeDisplayID == displayID else { return }
                     self.showFrameOverlay(for: displayID)
                 } catch {
+                    self.position = previousPosition
                     self.showError(error, title: "Positionswechsel fehlgeschlagen")
                 }
             }

@@ -73,7 +73,8 @@ Beispiele: 5120×1440 (32:9) → 2560×1440; 2560×1080 (21:9) → 1920×1080.
 - **Rahmen-Overlay:** randloses, transparentes, klick-durchlässiges Fenster
   (`ignoresMouseEvents = true`) auf dem Quellmonitor, nur Rand gezeichnet
   (CALayer-Border), kein Schatten, Level über der Menüleiste,
-  `canJoinAllSpaces` + `stationary`. Koordinaten-Umrechnung (display-lokales
+  `canJoinAllSpaces` + `stationary` + `fullScreenAuxiliary` (sichtbar auch
+  über Vollbild-Apps). Koordinaten-Umrechnung (display-lokales
   Top-Left-Rechteck → globales Cocoa-Bottom-Left-Frame) als reine,
   unit-getestete Funktion `CropCalculator.cocoaFrame(for:in:)` in
   `ScreenFramerCore`.
@@ -124,6 +125,9 @@ Beispiele: 5120×1440 (32:9) → 2560×1440; 2560×1080 (21:9) → 1920×1080.
 - Ein Monitorwechsel während laufender Übertragung erzeugt den virtuellen
   Bildschirm neu — eine laufende Teams-Freigabe endet dadurch und muss neu
   gestartet werden.
+- Ändert sich die Monitor-Geometrie während der Übertragung (Auflösung,
+  Anordnung), bleibt der Rahmen an den alten Koordinaten, bis die
+  Übertragung neu gestartet wird.
 
 ## Tests
 
