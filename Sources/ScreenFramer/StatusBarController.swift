@@ -8,7 +8,10 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     private let captureEngine = CaptureEngine()
     private var mirrorWindowController: MirrorWindowController?
 
-    private var selectedDisplayID: CGDirectDisplayID?
+    /// Monitor, auf dessen Menüleiste zuletzt geklickt wurde (beim Menü-Öffnen ermittelt)
+    private var clickedDisplayID: CGDirectDisplayID?
+    /// Monitor, der gerade übertragen wird
+    private var activeDisplayID: CGDirectDisplayID?
     private var position: CropPosition = .center
     private var isRunning = false
     private var isStarting = false
@@ -28,53 +31,39 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         statusItem.menu = menu
     }
 
-    // Menü bei jedem Öffnen neu aufbauen (Monitore können sich ändern)
+    // Menü bei jedem Öffnen neu aufbauen: Der Zielmonitor ist der Bildschirm,
+    // auf dessen Menüleiste geklickt wurde (automatische Erkennung).
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
 
-        let monitorItem = NSMenuItem(title: "Monitor", action: nil, keyEquivalent: "")
-        let monitorMenu = NSMenu()
-        for screen in NSScreen.screens {
-            guard let id = screen.displayID else { continue }
-            let item = NSMenuItem(
-                title: screen.localizedName,
-                action: #selector(selectMonitor(_:)),
-                keyEquivalent: "")
-            item.target = self
-            item.representedObject = NSNumber(value: id)
-            item.state = (id == selectedDisplayID) ? .on : .off
-            monitorMenu.addItem(item)
-        }
-        monitorItem.submenu = monitorMenu
-        menu.addItem(monitorItem)
+        let clickedScreen = statusItem.button?.window?.screen ?? NSScreen.main
+        clickedDisplayID = clickedScreen?.displayID
 
-        let positionItem = NSMenuItem(title: "Position", action: nil, keyEquivalent: "")
-        let positionMenu = NSMenu()
+        if let clickedScreen {
+            // Deaktivierter Info-Eintrag: zeigt, welcher Monitor übertragen würde
+            let infoItem = NSMenuItem(
+                title: "Monitor: \(clickedScreen.localizedName)", action: nil,
+                keyEquivalent: "")
+            menu.addItem(infoItem)
+            menu.addItem(.separator())
+        }
+
         for (value, title) in Self.positionTitles {
             let item = NSMenuItem(
-                title: title, action: #selector(selectPosition(_:)), keyEquivalent: "")
-            item.target = self
+                title: title, action: #selector(startTransmission(_:)), keyEquivalent: "")
+            item.target = (clickedDisplayID != nil && !isStarting) ? self : nil
             item.representedObject = value.rawValue
-            item.state = (value == position) ? .on : .off
-            positionMenu.addItem(item)
+            item.state = (isRunning && value == position) ? .on : .off
+            menu.addItem(item)
         }
-        positionItem.submenu = positionMenu
-        menu.addItem(positionItem)
 
-        menu.addItem(.separator())
         if isRunning {
+            menu.addItem(.separator())
             let stopItem = NSMenuItem(
                 title: "Übertragung stoppen", action: #selector(stopCapture),
                 keyEquivalent: "")
             stopItem.target = self
             menu.addItem(stopItem)
-        } else {
-            let startItem = NSMenuItem(
-                title: "Übertragung starten", action: #selector(startCapture),
-                keyEquivalent: "")
-            // Ohne Monitorauswahl kein Start (target = nil → Item ausgegraut)
-            startItem.target = (selectedDisplayID != nil && !isStarting) ? self : nil
-            menu.addItem(startItem)
         }
 
         menu.addItem(.separator())
@@ -84,25 +73,18 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         menu.addItem(quitItem)
     }
 
-    @objc private func selectMonitor(_ sender: NSMenuItem) {
-        guard let number = sender.representedObject as? NSNumber else { return }
-        let newID = CGDirectDisplayID(number.uint32Value)
-        guard newID != selectedDisplayID else { return }
-        selectedDisplayID = newID
-        if isRunning {
-            // Monitorwechsel während laufender Übertragung: neu starten
-            Task { @MainActor in
-                await self.teardown()
-                self.startCapture()
-            }
-        }
-    }
-
-    @objc private func selectPosition(_ sender: NSMenuItem) {
+    // Klick auf Links/Mitte/Rechts: startet die Übertragung für den Monitor,
+    // auf dem das Menü geöffnet wurde — bzw. schaltet nur die Position um,
+    // wenn genau dieser Monitor bereits übertragen wird.
+    @objc private func startTransmission(_ sender: NSMenuItem) {
         guard let raw = sender.representedObject as? String,
-              let newPosition = CropPosition(rawValue: raw) else { return }
-        position = newPosition
-        if isRunning {
+              let newPosition = CropPosition(rawValue: raw),
+              let displayID = clickedDisplayID,
+              !isStarting else { return }
+
+        if isRunning, displayID == activeDisplayID {
+            guard newPosition != position else { return }
+            position = newPosition
             Task { @MainActor in
                 do {
                     try await self.captureEngine.updatePosition(newPosition)
@@ -110,38 +92,48 @@ final class StatusBarController: NSObject, NSMenuDelegate {
                     self.showError(error)
                 }
             }
+            return
         }
+
+        position = newPosition
+        startCapture(on: displayID)
     }
 
-    @objc private func startCapture() {
-        guard let displayID = selectedDisplayID, !isRunning, !isStarting else { return }
+    private func startCapture(on displayID: CGDirectDisplayID) {
+        guard !isStarting else { return }
         guard CGPreflightScreenCaptureAccess() else {
             CGRequestScreenCaptureAccess()
             showPermissionAlert()
             return
         }
 
-        let windowController = MirrorWindowController()
-        windowController.onClose = { [weak self] in
-            guard let self, self.isRunning else { return }
-            Task { @MainActor in await self.teardown(closeWindow: false) }
-        }
-        captureEngine.onFrame = { [weak windowController] buffer in
-            windowController?.enqueue(buffer)
-        }
-        captureEngine.onStopped = { [weak self] error in
-            guard let self else { return }
-            Task { @MainActor in
-                await self.teardown(stopEngine: false)
-                if let error { self.showError(error) }
-            }
-        }
-
         isStarting = true
         Task { @MainActor in
+            // Laufende Übertragung (z. B. auf dem anderen Monitor) zuerst beenden
+            if self.isRunning {
+                await self.teardown()
+            }
+
+            let windowController = MirrorWindowController()
+            windowController.onClose = { [weak self] in
+                guard let self, self.isRunning else { return }
+                Task { @MainActor in await self.teardown(closeWindow: false) }
+            }
+            self.captureEngine.onFrame = { [weak windowController] buffer in
+                windowController?.enqueue(buffer)
+            }
+            self.captureEngine.onStopped = { [weak self] error in
+                guard let self else { return }
+                Task { @MainActor in
+                    await self.teardown(stopEngine: false)
+                    if let error { self.showError(error) }
+                }
+            }
+
             do {
                 try await self.captureEngine.start(displayID: displayID, position: self.position)
                 self.mirrorWindowController = windowController
+                self.activeDisplayID = displayID
                 self.isRunning = true
                 self.isStarting = false
                 windowController.showWindow(nil)
@@ -160,6 +152,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     @MainActor
     private func teardown(stopEngine: Bool = true, closeWindow: Bool = true) async {
         isRunning = false
+        activeDisplayID = nil
         if stopEngine {
             await captureEngine.stop()
         }

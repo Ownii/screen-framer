@@ -14,10 +14,18 @@ in Teams als Fenster geteilt.
 
 ## Bedienung (Menüleisten-Icon)
 
-- **Monitor:** Liste aller angeschlossenen Displays, manuelle Auswahl (Pflicht).
-- **Position:** Links / Mitte / Rechts — live umschaltbar, ohne die Übertragung
-  zu unterbrechen.
-- **Übertragung starten / stoppen.**
+- **Monitor: automatische Erkennung.** Übertragen wird der Bildschirm, auf
+  dessen Menüleiste das Icon angeklickt wurde (`statusItem.button?.window?.screen`
+  beim Menü-Öffnen; Fallback `NSScreen.main`). Ein deaktivierter Info-Eintrag
+  im Menü zeigt den erkannten Monitor an. Voraussetzung für die Menüleiste auf
+  allen Monitoren ist die macOS-Einstellung „Monitore verwenden verschiedene
+  Spaces" (Standard).
+- **Links / Mitte / Rechts startet direkt:** Ein Klick auf eine Position
+  startet die Übertragung für diese Position sofort. Läuft die Übertragung
+  bereits auf demselben Monitor, wird nur die Position live umgeschaltet
+  (ohne Unterbrechung); wurde das Menü auf einem anderen Monitor geöffnet,
+  wechselt die Übertragung dorthin (Neustart des Streams).
+- **Übertragung stoppen** (nur sichtbar, während die Übertragung läuft).
 - **Beenden.**
 
 ## Ausschnitt-Berechnung
@@ -54,7 +62,8 @@ Beispiele: 5120×1440 (32:9) → 2560×1440; 2560×1080 (21:9) → 1920×1080.
 ## Komponenten
 
 - **StatusBarController** — Menüleisten-Icon und Menü; hält den App-Zustand
-  (gewählter Monitor, Position, läuft/läuft nicht) und verdrahtet die Aktionen.
+  (erkannter Klick-Monitor, aktiver Monitor, Position, läuft/läuft nicht) und
+  verdrahtet die Aktionen.
 - **CaptureEngine** — kapselt ScreenCaptureKit vollständig: Stream-Aufbau,
   Frame-Lieferung als `CMSampleBuffer`, Live-Update des `sourceRect`, sauberes
   Stoppen, Fehler-Callbacks.
