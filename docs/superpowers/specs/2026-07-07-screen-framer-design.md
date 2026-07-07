@@ -32,8 +32,9 @@ wird in Teams als **Bildschirm** geteilt (nicht als Fenster).
 - **Rahmen um den Ausschnitt:** Solange die Übertragung läuft, markiert ein
   grüner Rahmen (4 pt, `systemGreen`) auf dem Quellmonitor den übertragenen
   16:9-Bereich; er wandert beim Positionswechsel mit und verschwindet bei
-  Stopp. Nur lokal sichtbar — die eigenen Fenster der App sind vom Capture
-  ausgeschlossen, Teilnehmende sehen ihn nicht.
+  Stopp. Nur lokal sichtbar — `sharingType = .none` nimmt das Rahmen-Fenster
+  aus jedem Capture heraus (eigene Übertragung, Teams, Screenshots),
+  Teilnehmende sehen ihn nicht.
 - **Übertragung stoppen** (nur sichtbar, während die Übertragung läuft).
   Gestoppt wird ausschließlich über das Menü oder durch Stream-Fehler; ein
   schließbares Fenster gibt es nicht mehr.
@@ -56,9 +57,12 @@ Beispiele: 5120×1440 (32:9) → 2560×1440; 2560×1080 (21:9) → 1920×1080.
 - **Sprache/Framework:** Swift, AppKit. Menüleiste via `NSStatusItem`,
   `LSUIElement = true` (kein Dock-Icon).
 - **Capture:** ScreenCaptureKit. `SCStream` mit `SCContentFilter` auf das
-  gewählte Display; die eigenen Fenster der App werden vom Capture
-  ausgeschlossen (kein Spiegel-im-Spiegel-Effekt). `sourceRect` =
-  16:9-Ausschnitt, 30 fps, Cursor sichtbar (`showsCursor = true`).
+  gewählte Display. `sourceRect` = 16:9-Ausschnitt, 30 fps, Cursor sichtbar
+  (`showsCursor = true`). Eigene Fenster auf dem Quellmonitor (der Rahmen)
+  werden per `NSWindow.sharingType = .none` aus dem Capture herausgehalten —
+  nicht über den App-Filter des Streams: dessen `applications`-Snapshot
+  entsteht zum Startzeitpunkt, wenn die App noch keine sichtbaren Fenster
+  besitzt, und greift daher nicht.
 - **Positionswechsel:** live über `SCStream.updateConfiguration` (neues
   `sourceRect`), Stream läuft weiter.
 - **Virtueller Bildschirm:** `CGVirtualDisplay` (private CoreGraphics-API,
