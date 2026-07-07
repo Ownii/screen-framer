@@ -9,8 +9,9 @@ Teilnehmenden unlesbar klein. Bisher bleibt nur das Teilen einzelner Fenster.
 ## Lösung
 
 Eine macOS-Menüleisten-App (kein Dock-Icon), die einen 16:9-Ausschnitt eines
-gewählten Monitors live in einem normalen Fenster spiegelt. Dieses Fenster wird
-in Teams als Fenster geteilt.
+Monitors live auf einen **virtuellen Bildschirm** spiegelt. Der virtuelle
+Bildschirm heißt „Screen Framer", existiert nur während der Übertragung und
+wird in Teams als **Bildschirm** geteilt (nicht als Fenster).
 
 ## Bedienung (Menüleisten-Icon)
 
@@ -25,7 +26,12 @@ in Teams als Fenster geteilt.
   bereits auf demselben Monitor, wird nur die Position live umgeschaltet
   (ohne Unterbrechung); wurde das Menü auf einem anderen Monitor geöffnet,
   wechselt die Übertragung dorthin (Neustart des Streams).
+- **Selbst-Capture-Schutz:** Wird das Menü auf dem virtuellen Bildschirm
+  selbst geöffnet (auch der hat eine Menüleiste), sind die Positionen
+  deaktiviert — der virtuelle Bildschirm ist nie Capture-Quelle.
 - **Übertragung stoppen** (nur sichtbar, während die Übertragung läuft).
+  Gestoppt wird ausschließlich über das Menü oder durch Stream-Fehler; ein
+  schließbares Fenster gibt es nicht mehr.
 - **Beenden.**
 
 ## Ausschnitt-Berechnung
@@ -50,10 +56,15 @@ Beispiele: 5120×1440 (32:9) → 2560×1440; 2560×1080 (21:9) → 1920×1080.
   16:9-Ausschnitt, 30 fps, Cursor sichtbar (`showsCursor = true`).
 - **Positionswechsel:** live über `SCStream.updateConfiguration` (neues
   `sourceRect`), Stream läuft weiter.
-- **Vorschau-Fenster:** Titel „Screen Framer", normales Fenster mit
-  Titelleiste, frei skalierbar, Seitenverhältnis fest 16:9
-  (`window.contentAspectRatio`). Rendering über `AVSampleBufferDisplayLayer`
-  (latenzarm, GPU-basiert). Fenster schließen stoppt die Übertragung.
+- **Virtueller Bildschirm:** `CGVirtualDisplay` (private CoreGraphics-API,
+  bewährt durch DeskPad/BetterDisplay; nur fehlende Header-Deklarationen,
+  kein Laufzeit-Hack). Name „Screen Framer", Auflösung = Pixelgröße des
+  Ausschnitts (cropRect × backingScaleFactor der Quelle), 60 Hz, ohne HiDPI.
+  Wird bei Übertragungsstart erzeugt und bei Stopp zerstört. Nach der
+  Erzeugung wird auf die `NSScreen`-Registrierung gewartet
+  (`didChangeScreenParametersNotification` + 2 s Timeout).
+- **Rendering:** randloses Vollbild-Fenster auf dem virtuellen Bildschirm,
+  Frames über `AVSampleBufferDisplayLayer` (latenzarm, GPU-basiert).
 - **Packaging:** Swift Package (SPM) + Build-Skript, das ein echtes
   `Screen Framer.app`-Bundle mit Info.plist und stabiler Bundle-ID erzeugt —
   nötig, damit macOS die Bildschirmaufnahme-Berechtigung (TCC) der App
@@ -67,8 +78,13 @@ Beispiele: 5120×1440 (32:9) → 2560×1440; 2560×1080 (21:9) → 1920×1080.
 - **CaptureEngine** — kapselt ScreenCaptureKit vollständig: Stream-Aufbau,
   Frame-Lieferung als `CMSampleBuffer`, Live-Update des `sourceRect`, sauberes
   Stoppen, Fehler-Callbacks.
-- **MirrorWindow** — das teilbare Fenster inkl. Display-Layer; nimmt
-  `CMSampleBuffer` entgegen und zeigt sie an.
+- **CGVirtualDisplayShim** — Objective-C-Target, das nur die Header-
+  Deklarationen der vier privaten Klassen (`CGVirtualDisplay`, `-Descriptor`,
+  `-Settings`, `-Mode`) bereitstellt.
+- **VirtualDisplayController** — erzeugt/zerstört den virtuellen Bildschirm,
+  wartet auf den zugehörigen `NSScreen`, meldet Fehler als `LocalizedError`.
+- **MirrorWindow** — randloses Vollbild-Fenster auf dem virtuellen Bildschirm
+  inkl. Display-Layer; nimmt `CMSampleBuffer` entgegen und zeigt sie an.
 - **CropCalculator** — reine Funktion: (Monitorgröße, Position) → Ausschnitts-
   Rechteck. Unit-getestet.
 
@@ -76,8 +92,20 @@ Beispiele: 5120×1440 (32:9) → 2560×1440; 2560×1080 (21:9) → 1920×1080.
 
 - Fehlende Bildschirmaufnahme-Berechtigung → Hinweis-Dialog mit Direktlink in
   die Systemeinstellungen (Datenschutz & Sicherheit → Bildschirmaufnahme).
-- Gewählter Monitor wird getrennt / Stream-Fehler → Übertragung stoppt sauber,
-  Hinweis an Nutzer*in.
+- Gewählter Monitor wird getrennt / Stream-Fehler → Übertragung stoppt sauber
+  (inkl. Zerstörung des virtuellen Bildschirms), Hinweis an Nutzer*in.
+- Erzeugung des virtuellen Bildschirms schlägt fehl (z. B. private API nach
+  macOS-Update gebrochen) → Fehlerdialog, sauberes Teardown, kein Absturz.
+
+## Bekannte Eigenheiten (akzeptiert)
+
+- `CGVirtualDisplay` ist eine private API und kann mit einem macOS-Update
+  brechen; der frühere Fenster-Modus ist über die Git-Historie
+  reaktivierbar.
+- Start/Stopp löst eine kurze Display-Neukonfiguration aus (Fenster anderer
+  Apps können kurz zucken).
+- Der Mauszeiger kann auf den virtuellen Bildschirm wandern — in v1 bewusst
+  nicht mitigiert.
 
 ## Tests
 
