@@ -91,15 +91,15 @@ public enum ConfigurationError: LocalizedError, Equatable {
         case .emptyName:
             return "Eine Konfiguration hat keinen Namen."
         case .duplicateName(let name):
-            return "Der Konfigurationsname \"\(name)\" wird mehrfach verwendet."
+            return "Der Konfigurationsname „\(name)\" wird mehrfach verwendet."
         case .invalidGrid(let name):
-            return "\"\(name)\": grid.columns und grid.rows müssen mindestens 1 sein."
+            return "„\(name)\": grid.columns und grid.rows müssen mindestens 1 sein."
         case .positionOutsideGrid(let name):
-            return "\"\(name)\": Die Position liegt außerhalb des Grids (0-basiert)."
+            return "„\(name)\": Die Position liegt außerhalb des Grids (0-basiert)."
         case .invalidSpan(let name):
-            return "\"\(name)\": span.columns und span.rows müssen mindestens 1 sein."
+            return "„\(name)\": span.columns und span.rows müssen mindestens 1 sein."
         case .spanExceedsGrid(let name):
-            return "\"\(name)\": Position + Span ragt über das Grid hinaus."
+            return "„\(name)\": Position + Span ragt über das Grid hinaus."
         }
     }
 }
