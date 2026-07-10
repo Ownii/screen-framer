@@ -67,11 +67,21 @@ final class StatusBarController: NSObject, NSMenuDelegate {
                 keyEquivalent: "")
             menu.addItem(emptyItem)
         }
-        // Breite des längsten Namens, damit die Icons rechts in einer Spalte fluchten
+        // Icons bündig an der rechten Menükante: Der rechtsbündige Tabstopp
+        // liegt an der Breite des breitesten Eintrags (Namen wie statische
+        // Einträge), damit die Icon-Spalte mit dem Menürand abschließt.
+        let displaySize = clickedScreen?.frame.size ?? CGSize(width: 16, height: 9)
         let menuFont = NSFont.menuFont(ofSize: 0)
-        let titleColumnWidth = configurations
-            .map { ceil(($0.name as NSString).size(withAttributes: [.font: menuFont]).width) }
-            .max() ?? 0
+        func titleWidth(_ title: String) -> CGFloat {
+            ceil((title as NSString).size(withAttributes: [.font: menuFont]).width)
+        }
+        var staticTitles = ["Konfigurationsdatei öffnen", "Konfiguration neu laden"]
+        if let clickedScreen { staticTitles.append("Monitor: \(clickedScreen.localizedName)") }
+        if isRunning { staticTitles.append("Übertragung stoppen") }
+        let iconWidth = ConfigurationIcon.size(forDisplaySize: displaySize).width
+        let iconRightEdge = max(
+            (configurations.map { titleWidth($0.name) }.max() ?? 0) + 24 + iconWidth,
+            staticTitles.map(titleWidth).max() ?? 0)
         for configuration in configurations {
             let item = NSMenuItem(
                 title: configuration.name,
@@ -80,9 +90,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
                 (clickedDisplayID != nil && !clickedIsVirtual && !isStarting) ? self : nil
             item.representedObject = configuration.name
             item.attributedTitle = ConfigurationIcon.attributedTitle(
-                for: configuration,
-                displaySize: clickedScreen?.frame.size ?? CGSize(width: 16, height: 9),
-                titleColumnWidth: titleColumnWidth)
+                for: configuration, displaySize: displaySize,
+                iconRightEdge: iconRightEdge)
             item.state =
                 (isRunning && configuration.name == activeConfiguration?.name)
                 ? .on : .off

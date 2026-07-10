@@ -7,19 +7,19 @@ import ScreenFramerCore
 enum ConfigurationIcon {
     private static let height: CGFloat = 12
 
-    /// Menü-Titel mit rechtsbündigem Icon: Name, Tabstopp, Icon als
-    /// Text-Attachment. `titleColumnWidth` ist die Breite des längsten
-    /// Namens, damit die Icons aller Einträge in einer Spalte fluchten.
+    /// Menü-Titel mit Icon an der rechten Menükante: Name, rechtsbündiger
+    /// Tabstopp, Icon als Text-Attachment. `iconRightEdge` ist die Position,
+    /// an der die rechte Icon-Kante aller Einträge abschließt.
     static func attributedTitle(
         for configuration: CropConfiguration, displaySize: CGSize,
-        titleColumnWidth: CGFloat
+        iconRightEdge: CGFloat
     ) -> NSAttributedString {
         let font = NSFont.menuFont(ofSize: 0)
         let icon = image(for: configuration, displaySize: displaySize)
 
         let paragraph = NSMutableParagraphStyle()
         paragraph.tabStops = [
-            NSTextTab(textAlignment: .left, location: titleColumnWidth + 14)
+            NSTextTab(textAlignment: .right, location: iconRightEdge)
         ]
         paragraph.lineBreakMode = .byClipping
 
@@ -36,15 +36,19 @@ enum ConfigurationIcon {
         return title
     }
 
-    /// `displaySize` bestimmt das Seitenverhältnis des Icons, damit es dem
-    /// Monitor entspricht, für den das Menü geöffnet wurde (32:9 → breit).
-    static func image(
-        for configuration: CropConfiguration, displaySize: CGSize
-    ) -> NSImage {
+    /// Icon-Größe im Seitenverhältnis des Monitors, für den das Menü
+    /// geöffnet wurde (32:9 → breit).
+    static func size(forDisplaySize displaySize: CGSize) -> NSSize {
         let aspect = displaySize.height > 0 ? displaySize.width / displaySize.height : 16.0 / 9.0
         // Breite begrenzen, damit extreme Monitore das Menü nicht sprengen
         let width = min(max((height * aspect).rounded(), 10), 42)
-        let size = NSSize(width: width, height: height)
+        return NSSize(width: width, height: height)
+    }
+
+    static func image(
+        for configuration: CropConfiguration, displaySize: CGSize
+    ) -> NSImage {
+        let size = size(forDisplaySize: displaySize)
 
         // flipped: Ursprung oben links, wie CropCalculator.cropRect.
         // labelColor statt Template: Als Text-Attachment wird das Icon nicht
