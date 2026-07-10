@@ -67,6 +67,11 @@ final class StatusBarController: NSObject, NSMenuDelegate {
                 keyEquivalent: "")
             menu.addItem(emptyItem)
         }
+        // Breite des längsten Namens, damit die Icons rechts in einer Spalte fluchten
+        let menuFont = NSFont.menuFont(ofSize: 0)
+        let titleColumnWidth = configurations
+            .map { ceil(($0.name as NSString).size(withAttributes: [.font: menuFont]).width) }
+            .max() ?? 0
         for configuration in configurations {
             let item = NSMenuItem(
                 title: configuration.name,
@@ -74,9 +79,10 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             item.target =
                 (clickedDisplayID != nil && !clickedIsVirtual && !isStarting) ? self : nil
             item.representedObject = configuration.name
-            item.image = ConfigurationIcon.image(
+            item.attributedTitle = ConfigurationIcon.attributedTitle(
                 for: configuration,
-                displaySize: clickedScreen?.frame.size ?? CGSize(width: 16, height: 9))
+                displaySize: clickedScreen?.frame.size ?? CGSize(width: 16, height: 9),
+                titleColumnWidth: titleColumnWidth)
             item.state =
                 (isRunning && configuration.name == activeConfiguration?.name)
                 ? .on : .off
