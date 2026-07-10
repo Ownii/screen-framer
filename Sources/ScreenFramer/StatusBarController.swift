@@ -74,6 +74,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             item.target =
                 (clickedDisplayID != nil && !clickedIsVirtual && !isStarting) ? self : nil
             item.representedObject = configuration.name
+            item.image = ConfigurationIcon.image(for: configuration)
             item.state =
                 (isRunning && configuration.name == activeConfiguration?.name)
                 ? .on : .off
