@@ -14,13 +14,11 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     private var clickedDisplayID: CGDirectDisplayID?
     /// Monitor, der gerade übertragen wird
     private var activeDisplayID: CGDirectDisplayID?
-    private var position: CropPosition = .center
+    private let configStore = ConfigStore()
+    private var configurations: [CropConfiguration] = []
+    private var activeConfiguration: CropConfiguration?
     private var isRunning = false
     private var isStarting = false
-
-    private static let positionTitles: [(CropPosition, String)] = [
-        (.left, "Links"), (.center, "Mitte"), (.right, "Rechts"),
-    ]
 
     override init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -31,6 +29,16 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         let menu = NSMenu()
         menu.delegate = self
         statusItem.menu = menu
+
+        do {
+            configurations = try configStore.loadCreatingIfMissing()
+        } catch {
+            // Launch nicht blockieren — Alert erst nach dem App-Start
+            DispatchQueue.main.async { [weak self] in
+                self?.showError(
+                    error, title: "Konfiguration konnte nicht geladen werden")
+            }
+        }
     }
 
     // Menü bei jedem Öffnen neu aufbauen: Der Zielmonitor ist der Bildschirm,
@@ -53,13 +61,22 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             menu.addItem(.separator())
         }
 
-        for (value, title) in Self.positionTitles {
+        if configurations.isEmpty {
+            let emptyItem = NSMenuItem(
+                title: "Keine gültigen Konfigurationen", action: nil,
+                keyEquivalent: "")
+            menu.addItem(emptyItem)
+        }
+        for configuration in configurations {
             let item = NSMenuItem(
-                title: title, action: #selector(startTransmission(_:)), keyEquivalent: "")
+                title: configuration.name,
+                action: #selector(startTransmission(_:)), keyEquivalent: "")
             item.target =
                 (clickedDisplayID != nil && !clickedIsVirtual && !isStarting) ? self : nil
-            item.representedObject = value.rawValue
-            item.state = (isRunning && value == position) ? .on : .off
+            item.representedObject = configuration.name
+            item.state =
+                (isRunning && configuration.name == activeConfiguration?.name)
+                ? .on : .off
             menu.addItem(item)
         }
 
@@ -79,47 +96,63 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         menu.addItem(quitItem)
     }
 
-    // Klick auf Links/Mitte/Rechts: startet die Übertragung für den Monitor,
-    // auf dem das Menü geöffnet wurde — bzw. schaltet nur die Position um,
+    // Klick auf eine Konfiguration: startet die Übertragung für den Monitor,
+    // auf dem das Menü geöffnet wurde — bzw. wechselt nur die Konfiguration,
     // wenn genau dieser Monitor bereits übertragen wird.
     @objc private func startTransmission(_ sender: NSMenuItem) {
-        guard let raw = sender.representedObject as? String,
-              let newPosition = CropPosition(rawValue: raw),
+        guard let name = sender.representedObject as? String,
+              let newConfiguration = configurations.first(where: { $0.name == name }),
               let displayID = clickedDisplayID,
               displayID != virtualDisplayController.displayID,
               !isStarting else { return }
 
         if isRunning, displayID == activeDisplayID {
-            guard newPosition != position else { return }
-            let previousPosition = position
-            position = newPosition
-            Task { @MainActor in
-                do {
-                    try await self.captureEngine.updatePosition(newPosition)
-                    // Zwischenzeitliches Teardown (z. B. Stream-Fehler): kein
-                    // Overlay für eine beendete Übertragung wiederbeleben
-                    guard self.isRunning, self.activeDisplayID == displayID else { return }
-                    self.showFrameOverlay(for: displayID)
-                } catch {
-                    self.position = previousPosition
-                    self.showError(error, title: "Positionswechsel fehlgeschlagen")
-                }
-            }
+            guard newConfiguration != activeConfiguration else { return }
+            switchConfiguration(to: newConfiguration, on: displayID)
             return
         }
 
-        position = newPosition
+        activeConfiguration = newConfiguration
         startCapture(on: displayID)
     }
 
+    /// Wechselt die Konfiguration einer laufenden Übertragung. Bleibt die
+    /// Pixelgröße des Ausschnitts gleich, wird nur der Stream umkonfiguriert;
+    /// sonst muss der virtuelle Bildschirm neu erzeugt werden (Neustart).
+    private func switchConfiguration(
+        to newConfiguration: CropConfiguration, on displayID: CGDirectDisplayID
+    ) {
+        let previous = activeConfiguration
+        activeConfiguration = newConfiguration
+        guard let previous,
+              cropPixelSize(for: displayID, configuration: previous)
+                  == cropPixelSize(for: displayID, configuration: newConfiguration)
+        else {
+            startCapture(on: displayID)
+            return
+        }
+        Task { @MainActor in
+            do {
+                try await self.captureEngine.update(configuration: newConfiguration)
+                // Zwischenzeitliches Teardown (z. B. Stream-Fehler): kein
+                // Overlay für eine beendete Übertragung wiederbeleben
+                guard self.isRunning, self.activeDisplayID == displayID else { return }
+                self.showFrameOverlay(for: displayID)
+            } catch {
+                self.activeConfiguration = previous
+                self.showError(error, title: "Konfigurationswechsel fehlgeschlagen")
+            }
+        }
+    }
+
     private func startCapture(on displayID: CGDirectDisplayID) {
-        guard !isStarting else { return }
+        guard !isStarting, let configuration = activeConfiguration else { return }
         guard CGPreflightScreenCaptureAccess() else {
             CGRequestScreenCaptureAccess()
             showPermissionAlert()
             return
         }
-        guard let pixelSize = cropPixelSize(for: displayID) else {
+        guard let pixelSize = cropPixelSize(for: displayID, configuration: configuration) else {
             showError(
                 CaptureError.displayNotFound,
                 title: "Übertragung konnte nicht gestartet werden")
@@ -148,7 +181,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
                     }
                 }
                 try await self.captureEngine.start(
-                    displayID: displayID, position: self.position)
+                    displayID: displayID, configuration: configuration)
                 windowController.window?.orderFrontRegardless()
                 self.mirrorWindowController = windowController
                 self.activeDisplayID = displayID
@@ -164,23 +197,25 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         }
     }
 
-    /// Pixelgröße des 16:9-Ausschnitts = Auflösung des virtuellen Bildschirms.
-    /// (Unabhängig von der Position — Breite/Höhe sind für alle Anker gleich.)
-    private func cropPixelSize(for displayID: CGDirectDisplayID) -> CGSize? {
+    /// Pixelgröße des Ausschnitts = Auflösung des virtuellen Bildschirms.
+    private func cropPixelSize(
+        for displayID: CGDirectDisplayID, configuration: CropConfiguration
+    ) -> CGSize? {
         guard let screen = NSScreen.screens.first(where: { $0.displayID == displayID })
         else { return nil }
         let crop = CropCalculator.cropRect(
-            displaySize: screen.frame.size, position: position)
+            displaySize: screen.frame.size, configuration: configuration)
         let scale = screen.backingScaleFactor
         return CGSize(width: crop.width * scale, height: crop.height * scale)
     }
 
     /// Zeigt den Rahmen um den aktuellen Ausschnitt bzw. verschiebt ihn.
     private func showFrameOverlay(for displayID: CGDirectDisplayID) {
-        guard let screen = NSScreen.screens.first(where: { $0.displayID == displayID })
+        guard let configuration = activeConfiguration,
+              let screen = NSScreen.screens.first(where: { $0.displayID == displayID })
         else { return }
         let crop = CropCalculator.cropRect(
-            displaySize: screen.frame.size, position: position)
+            displaySize: screen.frame.size, configuration: configuration)
         if let overlay = frameOverlayController {
             overlay.move(to: crop, on: screen)
         } else {

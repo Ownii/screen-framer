@@ -21,12 +21,12 @@ final class CaptureEngine: NSObject {
     var onStopped: ((Error?) -> Void)?
 
     private var stream: SCStream?
-    private var configuration: SCStreamConfiguration?
+    private var streamConfiguration: SCStreamConfiguration?
     private var displaySize: CGSize = .zero
     private var scaleFactor: CGFloat = 1
     private let sampleQueue = DispatchQueue(label: "de.martinfoerster.screen-framer.capture")
 
-    func start(displayID: CGDirectDisplayID, position: CropPosition) async throws {
+    func start(displayID: CGDirectDisplayID, configuration: CropConfiguration) async throws {
         // Bereits laufenden Stream sauber beenden, bevor ein neuer startet
         if stream != nil {
             await stop()
@@ -54,7 +54,7 @@ final class CaptureEngine: NSObject {
 
         displaySize = CGSize(width: display.width, height: display.height)
         let config = SCStreamConfiguration()
-        applyCrop(position: position, to: config)
+        applyCrop(configuration: configuration, to: config)
         config.minimumFrameInterval = CMTime(value: 1, timescale: 30)
         config.showsCursor = true
         config.pixelFormat = kCVPixelFormatType_32BGRA
@@ -64,24 +64,27 @@ final class CaptureEngine: NSObject {
         try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: sampleQueue)
         try await stream.startCapture()
         self.stream = stream
-        self.configuration = config
+        self.streamConfiguration = config
     }
 
-    func updatePosition(_ position: CropPosition) async throws {
-        guard let stream, let config = configuration else { return }
-        applyCrop(position: position, to: config)
+    func update(configuration: CropConfiguration) async throws {
+        guard let stream, let config = streamConfiguration else { return }
+        applyCrop(configuration: configuration, to: config)
         try await stream.updateConfiguration(config)
     }
 
     func stop() async {
         guard let stream else { return }
         self.stream = nil
-        self.configuration = nil
+        self.streamConfiguration = nil
         try? await stream.stopCapture()
     }
 
-    private func applyCrop(position: CropPosition, to config: SCStreamConfiguration) {
-        let crop = CropCalculator.cropRect(displaySize: displaySize, position: position)
+    private func applyCrop(
+        configuration: CropConfiguration, to config: SCStreamConfiguration
+    ) {
+        let crop = CropCalculator.cropRect(
+            displaySize: displaySize, configuration: configuration)
         config.sourceRect = crop
         config.width = Int(crop.width * scaleFactor)
         config.height = Int(crop.height * scaleFactor)
@@ -111,7 +114,7 @@ extension CaptureEngine: SCStreamDelegate {
         DispatchQueue.main.async { [weak self] in
             guard let self, self.stream === stream else { return }
             self.stream = nil
-            self.configuration = nil
+            self.streamConfiguration = nil
             self.onStopped?(error)
         }
     }
