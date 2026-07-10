@@ -67,37 +67,30 @@ final class StatusBarController: NSObject, NSMenuDelegate {
                 keyEquivalent: "")
             menu.addItem(emptyItem)
         }
-        // Icons bündig an der rechten Menükante: Der rechtsbündige Tabstopp
-        // liegt an der Breite des breitesten Eintrags (Namen wie statische
-        // Einträge), damit die Icon-Spalte mit dem Menürand abschließt.
+        // Konfigurationseinträge als eigene Views (Icon rechtsbündig).
+        // Alle bekommen dieselbe Breite = die des breitesten Eintrags, damit
+        // die Konfig-Zeilen die breitesten im Menü sind und ihre Icons die
+        // rechte Menükante definieren (ein NSMenuItem-Titel kann das nicht).
         let displaySize = clickedScreen?.frame.size ?? CGSize(width: 16, height: 9)
-        let menuFont = NSFont.menuFont(ofSize: 0)
-        func titleWidth(_ title: String) -> CGFloat {
-            ceil((title as NSString).size(withAttributes: [.font: menuFont]).width)
-        }
-        var staticTitles = ["Konfigurationsdatei öffnen", "Konfiguration neu laden"]
-        if let clickedScreen { staticTitles.append("Monitor: \(clickedScreen.localizedName)") }
-        if isRunning { staticTitles.append("Übertragung stoppen") }
-        // Icons bündig am Menürand: Die Konfigurations-Zeilen sind bewusst die
-        // breitesten Einträge (breitester Text + Abstand + Icon), damit ihre
-        // Icons die rechte Menükante bestimmen statt links davon zu enden.
-        let iconWidth = ConfigurationIcon.size(forDisplaySize: displaySize).width
-        let widestTitle = (configurations.map { titleWidth($0.name) } + staticTitles.map(titleWidth))
-            .max() ?? 0
-        let iconRightEdge = widestTitle + 16 + iconWidth
-        for configuration in configurations {
+        let isEnabled = clickedDisplayID != nil && !clickedIsVirtual && !isStarting
+        let items = configurations.map { configuration -> NSMenuItem in
             let item = NSMenuItem(
-                title: configuration.name,
-                action: #selector(startTransmission(_:)), keyEquivalent: "")
-            item.target =
-                (clickedDisplayID != nil && !clickedIsVirtual && !isStarting) ? self : nil
+                title: configuration.name, action: nil, keyEquivalent: "")
             item.representedObject = configuration.name
-            item.attributedTitle = ConfigurationIcon.attributedTitle(
-                for: configuration, displaySize: displaySize,
-                iconRightEdge: iconRightEdge)
-            item.state =
-                (isRunning && configuration.name == activeConfiguration?.name)
-                ? .on : .off
+            return item
+        }
+        let views = configurations.map { configuration in
+            ConfigurationMenuItemView(
+                configuration: configuration, displaySize: displaySize,
+                isActive: isRunning && configuration.name == activeConfiguration?.name,
+                isEnabled: isEnabled, width: 0,
+                onSelect: { [weak self] in self?.selectConfiguration(named: configuration.name) })
+        }
+        let rowWidth = views.map { $0.fittingWidth() }.max() ?? 0
+        for (item, view) in zip(items, views) {
+            view.setFrameSize(NSSize(width: rowWidth, height: view.frame.height))
+            view.autoresizingMask = [.width]
+            item.view = view
             menu.addItem(item)
         }
 
@@ -134,9 +127,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     // Klick auf eine Konfiguration: startet die Übertragung für den Monitor,
     // auf dem das Menü geöffnet wurde — bzw. wechselt nur die Konfiguration,
     // wenn genau dieser Monitor bereits übertragen wird.
-    @objc private func startTransmission(_ sender: NSMenuItem) {
-        guard let name = sender.representedObject as? String,
-              let newConfiguration = configurations.first(where: { $0.name == name }),
+    private func selectConfiguration(named name: String) {
+        guard let newConfiguration = configurations.first(where: { $0.name == name }),
               let displayID = clickedDisplayID,
               displayID != virtualDisplayController.displayID,
               !isStarting else { return }
