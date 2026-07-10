@@ -83,4 +83,77 @@ final class CropConfigurationTests: XCTestCase {
             }
         }
     }
+
+    // MARK: - Validierung
+
+    private func assertParseThrows(
+        _ yaml: String, _ expected: ConfigurationError,
+        file: StaticString = #filePath, line: UInt = #line
+    ) {
+        XCTAssertThrowsError(
+            try ConfigurationParser.parse(yaml: yaml), file: file, line: line
+        ) { error in
+            XCTAssertEqual(
+                error as? ConfigurationError, expected, file: file, line: line)
+        }
+    }
+
+    func testEmptyNameThrows() {
+        assertParseThrows("""
+            configurations:
+              - name: "  "
+            """, .emptyName)
+    }
+
+    func testDuplicateNameThrows() {
+        assertParseThrows("""
+            configurations:
+              - name: Links
+              - name: Links
+            """, .duplicateName("Links"))
+    }
+
+    func testZeroGridThrows() {
+        assertParseThrows("""
+            configurations:
+              - name: Kaputt
+                grid:
+                  columns: 0
+            """, .invalidGrid(name: "Kaputt"))
+    }
+
+    func testPositionOutsideGridThrows() {
+        assertParseThrows("""
+            configurations:
+              - name: Daneben
+                grid:
+                  columns: 2
+                position:
+                  column: 2
+            """, .positionOutsideGrid(name: "Daneben"))
+    }
+
+    func testZeroSpanThrows() {
+        assertParseThrows("""
+            configurations:
+              - name: Leer
+                grid:
+                  columns: 2
+                span:
+                  columns: 0
+            """, .invalidSpan(name: "Leer"))
+    }
+
+    func testSpanBeyondGridThrows() {
+        assertParseThrows("""
+            configurations:
+              - name: Zuweit
+                grid:
+                  columns: 3
+                position:
+                  column: 1
+                span:
+                  columns: 3
+            """, .spanExceedsGrid(name: "Zuweit"))
+    }
 }

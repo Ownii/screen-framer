@@ -27,6 +27,23 @@ public struct CropConfiguration: Equatable, Sendable {
         self.columnSpan = columnSpan ?? gridColumns - column
         self.rowSpan = rowSpan ?? gridRows - row
     }
+
+    /// Wirft einen `ConfigurationError`, wenn der Eintrag in sich
+    /// widersprüchlich ist (Position/Span außerhalb des Grids etc.).
+    public func validate() throws {
+        guard gridColumns >= 1, gridRows >= 1 else {
+            throw ConfigurationError.invalidGrid(name: name)
+        }
+        guard (0..<gridColumns).contains(column), (0..<gridRows).contains(row) else {
+            throw ConfigurationError.positionOutsideGrid(name: name)
+        }
+        guard columnSpan >= 1, rowSpan >= 1 else {
+            throw ConfigurationError.invalidSpan(name: name)
+        }
+        guard column + columnSpan <= gridColumns, row + rowSpan <= gridRows else {
+            throw ConfigurationError.spanExceedsGrid(name: name)
+        }
+    }
 }
 
 extension CropConfiguration: Decodable {
@@ -60,11 +77,29 @@ extension CropConfiguration: Decodable {
 
 public enum ConfigurationError: LocalizedError, Equatable {
     case invalidYAML(String)
+    case emptyName
+    case duplicateName(String)
+    case invalidGrid(name: String)
+    case positionOutsideGrid(name: String)
+    case invalidSpan(name: String)
+    case spanExceedsGrid(name: String)
 
     public var errorDescription: String? {
         switch self {
         case .invalidYAML(let detail):
             return "Die Konfigurationsdatei ist kein gültiges YAML: \(detail)"
+        case .emptyName:
+            return "Eine Konfiguration hat keinen Namen."
+        case .duplicateName(let name):
+            return "Der Konfigurationsname \"\(name)\" wird mehrfach verwendet."
+        case .invalidGrid(let name):
+            return "\"\(name)\": grid.columns und grid.rows müssen mindestens 1 sein."
+        case .positionOutsideGrid(let name):
+            return "\"\(name)\": Die Position liegt außerhalb des Grids (0-basiert)."
+        case .invalidSpan(let name):
+            return "\"\(name)\": span.columns und span.rows müssen mindestens 1 sein."
+        case .spanExceedsGrid(let name):
+            return "\"\(name)\": Position + Span ragt über das Grid hinaus."
         }
     }
 }
@@ -81,6 +116,16 @@ public enum ConfigurationParser {
             file = try YAMLDecoder().decode(ConfigFile.self, from: yaml)
         } catch {
             throw ConfigurationError.invalidYAML(String(describing: error))
+        }
+        var seenNames = Set<String>()
+        for configuration in file.configurations {
+            guard !configuration.name.trimmingCharacters(in: .whitespaces).isEmpty else {
+                throw ConfigurationError.emptyName
+            }
+            guard seenNames.insert(configuration.name).inserted else {
+                throw ConfigurationError.duplicateName(configuration.name)
+            }
+            try configuration.validate()
         }
         return file.configurations
     }
