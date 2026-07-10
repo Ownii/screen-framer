@@ -90,6 +90,18 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         }
 
         menu.addItem(.separator())
+        let openItem = NSMenuItem(
+            title: "Konfigurationsdatei öffnen",
+            action: #selector(openConfigFile), keyEquivalent: "")
+        openItem.target = self
+        menu.addItem(openItem)
+        let reloadItem = NSMenuItem(
+            title: "Konfiguration neu laden",
+            action: #selector(reloadConfig), keyEquivalent: "")
+        reloadItem.target = self
+        menu.addItem(reloadItem)
+
+        menu.addItem(.separator())
         let quitItem = NSMenuItem(
             title: "Beenden", action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q")
@@ -225,6 +237,39 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
     @objc private func stopCapture() {
         Task { @MainActor in await self.teardown() }
+    }
+
+    /// Öffnet die Config-Datei im Standardprogramm für YAML-Dateien —
+    /// identisch zum Doppelklick im Finder.
+    @objc private func openConfigFile() {
+        NSWorkspace.shared.open(configStore.fileURL)
+    }
+
+    // Liest die Config-Datei neu ein. Bei Fehlern bleibt die zuletzt
+    // gültige Liste aktiv. Für eine laufende Übertragung gilt: aktive
+    // Konfiguration (per Name) unverändert → weiterlaufen; Geometrie
+    // geändert → Wechsel/Neustart; gelöscht → stoppen.
+    @objc private func reloadConfig() {
+        do {
+            configurations = try configStore.load()
+        } catch {
+            showError(error, title: "Konfiguration konnte nicht geladen werden")
+            return
+        }
+
+        guard isRunning, let active = activeConfiguration else { return }
+        guard let updated = configurations.first(where: { $0.name == active.name })
+        else {
+            // Aktive Konfiguration wurde entfernt → Übertragung stoppen
+            Task { @MainActor in await self.teardown() }
+            return
+        }
+        guard updated != active else { return }
+        if let displayID = activeDisplayID {
+            switchConfiguration(to: updated, on: displayID)
+        } else {
+            activeConfiguration = updated
+        }
     }
 
     @MainActor
