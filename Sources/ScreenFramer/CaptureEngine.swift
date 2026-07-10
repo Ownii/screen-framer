@@ -14,8 +14,8 @@ enum CaptureError: LocalizedError {
     }
 }
 
-/// Kapselt ScreenCaptureKit: baut den Stream mit 16:9-sourceRect auf,
-/// liefert Frames über `onFrame` und meldet externe Stopps über `onStopped`.
+/// Kapselt ScreenCaptureKit: baut den Stream mit dem konfigurierten Grid-Ausschnitt
+/// als sourceRect auf, liefert Frames über `onFrame` und meldet externe Stopps über `onStopped`.
 final class CaptureEngine: NSObject {
     var onFrame: ((CMSampleBuffer) -> Void)?
     var onStopped: ((Error?) -> Void)?

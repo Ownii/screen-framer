@@ -261,6 +261,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         guard let updated = configurations.first(where: { $0.name == active.name })
         else {
             // Aktive Konfiguration wurde entfernt → Übertragung stoppen
+            activeConfiguration = nil
             Task { @MainActor in await self.teardown() }
             return
         }
