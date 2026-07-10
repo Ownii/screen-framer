@@ -78,10 +78,13 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         var staticTitles = ["Konfigurationsdatei öffnen", "Konfiguration neu laden"]
         if let clickedScreen { staticTitles.append("Monitor: \(clickedScreen.localizedName)") }
         if isRunning { staticTitles.append("Übertragung stoppen") }
+        // Icons bündig am Menürand: Die Konfigurations-Zeilen sind bewusst die
+        // breitesten Einträge (breitester Text + Abstand + Icon), damit ihre
+        // Icons die rechte Menükante bestimmen statt links davon zu enden.
         let iconWidth = ConfigurationIcon.size(forDisplaySize: displaySize).width
-        let iconRightEdge = max(
-            (configurations.map { titleWidth($0.name) }.max() ?? 0) + 24 + iconWidth,
-            staticTitles.map(titleWidth).max() ?? 0)
+        let widestTitle = (configurations.map { titleWidth($0.name) } + staticTitles.map(titleWidth))
+            .max() ?? 0
+        let iconRightEdge = widestTitle + 16 + iconWidth
         for configuration in configurations {
             let item = NSMenuItem(
                 title: configuration.name,
