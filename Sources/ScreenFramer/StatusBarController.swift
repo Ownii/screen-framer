@@ -1,5 +1,6 @@
 import AppKit
 import ScreenFramerCore
+import ServiceManagement
 
 /// Menüleisten-Icon und Menü; hält den App-Zustand und verdrahtet
 /// VirtualDisplayController, CaptureEngine und MirrorWindowController.
@@ -116,10 +117,33 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         menu.addItem(reloadItem)
 
         menu.addItem(.separator())
+        let launchItem = NSMenuItem(
+            title: "Beim Anmelden starten",
+            action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
+        launchItem.target = self
+        launchItem.state = (SMAppService.mainApp.status == .enabled) ? .on : .off
+        menu.addItem(launchItem)
+
+        menu.addItem(.separator())
         let quitItem = NSMenuItem(
             title: "Beenden", action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q")
         menu.addItem(quitItem)
+    }
+
+    // Schaltet den Autostart über SMAppService um. Registrierung/Abmeldung
+    // wirken nur aus dem App-Bundle heraus (nicht bei `swift run`).
+    @objc private func toggleLaunchAtLogin() {
+        let service = SMAppService.mainApp
+        do {
+            if service.status == .enabled {
+                try service.unregister()
+            } else {
+                try service.register()
+            }
+        } catch {
+            showError(error, title: "Autostart konnte nicht geändert werden")
+        }
     }
 
     // Klick auf eine Konfiguration: startet die Übertragung für den Monitor,

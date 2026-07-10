@@ -42,6 +42,9 @@ Voraussetzung: macOS 14 (Sonoma) oder neuer.
 **Übertragung stoppen** im Menü beendet die Übertragung und entfernt den
 virtuellen Bildschirm.
 
+**Beim Anmelden starten** im Menü schaltet den Autostart an bzw. aus — die
+App startet dann automatisch nach jeder Anmeldung.
+
 ## Konfiguration
 
 Beim ersten Start wird die Datei `~/.config/screen-framer/config.yaml` mit
