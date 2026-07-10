@@ -120,9 +120,11 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         menu.addItem(reloadItem)
 
         menu.addItem(.separator())
+        // Kein ⌘Q: Das Kürzel würde bei allen Einträgen eine Spalte am rechten
+        // Rand reservieren und die rechtsbündigen Icons vom Rand wegdrücken.
         let quitItem = NSMenuItem(
             title: "Beenden", action: #selector(NSApplication.terminate(_:)),
-            keyEquivalent: "q")
+            keyEquivalent: "")
         menu.addItem(quitItem)
     }
 
