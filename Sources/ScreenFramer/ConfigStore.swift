@@ -37,6 +37,19 @@ final class ConfigStore {
         #   grid:     columns/rows – Spalten/Zeilen des Rasters (Default je 1)
         #   position: column/row   – Zelle oben links des Ausschnitts (Default 0/0)
         #   span:     columns/rows – Ausdehnung in Zellen (Default: bis zum Grid-Ende)
+        #
+        # Optional bindet displays eine Konfiguration an bestimmte Monitore
+        # (Liste von Monitor-Kennungen). Fehlt das Feld, gilt sie für alle
+        # Monitore. Die Kennung eines Monitors bekommst du per Klick auf die
+        # oberste Menü-Zeile („Monitor: …") — sie landet in der Zwischenablage:
+        #
+        #   - name: Nur Ultrawide
+        #     displays:
+        #       - "37D8832A-2D66-02CA-B9F7-8F30A301B230"  # DELL U2720Q
+        #     grid:
+        #       columns: 2
+        #     position:
+        #       column: 0
         configurations:
           - name: Links
             grid:
