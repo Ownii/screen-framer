@@ -12,12 +12,16 @@ public struct CropConfiguration: Equatable, Sendable {
     public var row: Int
     public var columnSpan: Int
     public var rowSpan: Int
+    /// Monitor-Kennungen (Display-UUIDs), auf die diese Konfiguration
+    /// beschränkt ist. `nil` → gilt für alle Monitore.
+    public var displays: [String]?
 
     /// `columnSpan`/`rowSpan` = nil → Span reicht bis zum Grid-Ende.
     public init(
         name: String, gridColumns: Int = 1, gridRows: Int = 1,
         column: Int = 0, row: Int = 0,
-        columnSpan: Int? = nil, rowSpan: Int? = nil
+        columnSpan: Int? = nil, rowSpan: Int? = nil,
+        displays: [String]? = nil
     ) {
         self.name = name
         self.gridColumns = gridColumns
@@ -26,6 +30,19 @@ public struct CropConfiguration: Equatable, Sendable {
         self.row = row
         self.columnSpan = columnSpan ?? gridColumns - column
         self.rowSpan = rowSpan ?? gridRows - row
+        // Leere Einträge verwerfen; bleibt nichts übrig → nil (alle Monitore).
+        let cleaned = displays?
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        self.displays = (cleaned?.isEmpty ?? true) ? nil : cleaned
+    }
+
+    /// True, wenn die Konfiguration auf dem Monitor mit dieser Kennung
+    /// erscheinen soll. Ohne `displays` gilt sie für alle Monitore.
+    public func matches(displayUUID: String?) -> Bool {
+        guard let displays else { return true }
+        guard let displayUUID else { return false }
+        return displays.contains(displayUUID)
     }
 
     /// Wirft einen `ConfigurationError`, wenn der Eintrag in sich
@@ -48,7 +65,7 @@ public struct CropConfiguration: Equatable, Sendable {
 
 extension CropConfiguration: Decodable {
     private enum CodingKeys: String, CodingKey {
-        case name, grid, position, span
+        case name, grid, position, span, displays
     }
     private struct Axes: Decodable {
         var columns: Int?
@@ -64,6 +81,7 @@ extension CropConfiguration: Decodable {
         let grid = try container.decodeIfPresent(Axes.self, forKey: .grid)
         let position = try container.decodeIfPresent(Cell.self, forKey: .position)
         let span = try container.decodeIfPresent(Axes.self, forKey: .span)
+        let displays = try container.decodeIfPresent([String].self, forKey: .displays)
         self.init(
             name: try container.decode(String.self, forKey: .name),
             gridColumns: grid?.columns ?? 1,
@@ -71,7 +89,8 @@ extension CropConfiguration: Decodable {
             column: position?.column ?? 0,
             row: position?.row ?? 0,
             columnSpan: span?.columns,
-            rowSpan: span?.rows)
+            rowSpan: span?.rows,
+            displays: displays)
     }
 }
 

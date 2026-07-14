@@ -156,4 +156,58 @@ final class CropConfigurationTests: XCTestCase {
                   columns: 3
             """, .spanExceedsGrid(name: "Zuweit"))
     }
+
+    // MARK: - displays (Monitor-Bindung)
+
+    func testParsesDisplaysList() throws {
+        let configs = try ConfigurationParser.parse(yaml: """
+            configurations:
+              - name: Nur Ultrawide
+                displays:
+                  - "UUID-A"
+                  - "UUID-B"
+            """)
+        XCTAssertEqual(configs.first?.displays, ["UUID-A", "UUID-B"])
+    }
+
+    func testMissingDisplaysIsNil() throws {
+        let configs = try ConfigurationParser.parse(yaml: """
+            configurations:
+              - name: Überall
+            """)
+        XCTAssertNil(configs.first?.displays)
+    }
+
+    func testEmptyDisplaysListIsNil() throws {
+        let configs = try ConfigurationParser.parse(yaml: """
+            configurations:
+              - name: Überall
+                displays: []
+            """)
+        XCTAssertNil(configs.first?.displays)
+    }
+
+    func testWhitespaceDisplaysEntriesAreDropped() throws {
+        let configs = try ConfigurationParser.parse(yaml: """
+            configurations:
+              - name: Gemischt
+                displays:
+                  - "  "
+                  - " UUID-A "
+            """)
+        XCTAssertEqual(configs.first?.displays, ["UUID-A"])
+    }
+
+    func testMatchesWithoutDisplaysAlwaysTrue() {
+        let config = CropConfiguration(name: "Überall")
+        XCTAssertTrue(config.matches(displayUUID: "UUID-A"))
+        XCTAssertTrue(config.matches(displayUUID: nil))
+    }
+
+    func testMatchesOnlyListedDisplays() {
+        let config = CropConfiguration(name: "Gebunden", displays: ["UUID-A"])
+        XCTAssertTrue(config.matches(displayUUID: "UUID-A"))
+        XCTAssertFalse(config.matches(displayUUID: "UUID-B"))
+        XCTAssertFalse(config.matches(displayUUID: nil))
+    }
 }
