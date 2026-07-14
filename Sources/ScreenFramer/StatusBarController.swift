@@ -54,10 +54,17 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             clickedDisplayID != nil
             && clickedDisplayID == virtualDisplayController.displayID
 
+        let clickedUUID = clickedScreen?.displayUUID
         if let clickedScreen {
             let infoItem = NSMenuItem(
                 title: "Monitor: \(clickedScreen.localizedName)", action: nil,
                 keyEquivalent: "")
+            if let clickedUUID {
+                infoItem.action = #selector(copyMonitorIdentifier(_:))
+                infoItem.target = self
+                infoItem.representedObject = "\(clickedUUID)  # \(clickedScreen.localizedName)"
+                infoItem.toolTip = "Monitor-Kennung in die Zwischenablage kopieren"
+            }
             menu.addItem(infoItem)
             menu.addItem(.separator())
         }
@@ -282,6 +289,15 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         NSWorkspace.shared.open(configStore.fileURL)
     }
 
+    /// Klick auf die Monitor-Zeile: legt „<uuid>  # <name>" in die
+    /// Zwischenablage, damit die Kennung direkt in die YAML kopiert werden
+    /// kann (der Name als Kommentar bleibt lesbar).
+    @objc private func copyMonitorIdentifier(_ sender: NSMenuItem) {
+        guard let text = sender.representedObject as? String else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    }
+
     // Liest die Config-Datei neu ein. Bei Fehlern bleibt die zuletzt
     // gültige Liste aktiv. Für eine laufende Übertragung gilt: aktive
     // Konfiguration (per Name) unverändert → weiterlaufen; Geometrie
@@ -356,5 +372,14 @@ extension NSScreen {
     var displayID: CGDirectDisplayID? {
         let number = deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
         return number.map { CGDirectDisplayID($0.uint32Value) }
+    }
+
+    /// Stabile Kennung des Monitors (überlebt Neustart/Umstecken), anders
+    /// als die nur zur Laufzeit gültige `displayID`.
+    var displayUUID: String? {
+        guard let displayID,
+              let cfUUID = CGDisplayCreateUUIDFromDisplayID(displayID)?.takeRetainedValue()
+        else { return nil }
+        return CFUUIDCreateString(nil, cfUUID) as String
     }
 }
