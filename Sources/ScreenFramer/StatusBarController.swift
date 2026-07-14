@@ -311,6 +311,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     // gültige Liste aktiv. Für eine laufende Übertragung gilt: aktive
     // Konfiguration (per Name) unverändert → weiterlaufen; Geometrie
     // geändert → Wechsel/Neustart; gelöscht → stoppen.
+    // `displays` steuert nur die Menü-Sichtbarkeit, nicht eine bereits
+    // laufende Übertragung — die läuft weiter, bis sie gestoppt wird.
     @objc private func reloadConfig() {
         do {
             configurations = try configStore.load()
