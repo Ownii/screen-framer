@@ -69,9 +69,18 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             menu.addItem(.separator())
         }
 
+        let visibleConfigurations = configurations.filter {
+            $0.matches(displayUUID: clickedUUID)
+        }
+
         if configurations.isEmpty {
             let emptyItem = NSMenuItem(
                 title: "Keine gültigen Konfigurationen", action: nil,
+                keyEquivalent: "")
+            menu.addItem(emptyItem)
+        } else if visibleConfigurations.isEmpty {
+            let emptyItem = NSMenuItem(
+                title: "Keine Konfiguration für diesen Monitor", action: nil,
                 keyEquivalent: "")
             menu.addItem(emptyItem)
         }
@@ -81,13 +90,13 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         // rechte Menükante definieren (ein NSMenuItem-Titel kann das nicht).
         let displaySize = clickedScreen?.frame.size ?? CGSize(width: 16, height: 9)
         let isEnabled = clickedDisplayID != nil && !clickedIsVirtual && !isStarting
-        let items = configurations.map { configuration -> NSMenuItem in
+        let items = visibleConfigurations.map { configuration -> NSMenuItem in
             let item = NSMenuItem(
                 title: configuration.name, action: nil, keyEquivalent: "")
             item.representedObject = configuration.name
             return item
         }
-        let views = configurations.map { configuration in
+        let views = visibleConfigurations.map { configuration in
             ConfigurationMenuItemView(
                 configuration: configuration, displaySize: displaySize,
                 isActive: isRunning && configuration.name == activeConfiguration?.name,
