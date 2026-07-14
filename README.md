@@ -39,6 +39,10 @@ Voraussetzung: macOS 14 (Sonoma) oder neuer.
    auf einem anderen Monitor wechselt die Übertragung dorthin.
 3. In Teams **Bildschirm teilen** → „Screen Framer".
 
+Ein Klick auf die oberste Menü-Zeile („Monitor: …") kopiert die stabile
+Kennung des erkannten Monitors in die Zwischenablage — praktisch, um eine
+Konfiguration auf diesen Monitor zu beschränken (siehe unten).
+
 **Übertragung stoppen** im Menü beendet die Übertragung und entfernt den
 virtuellen Bildschirm.
 
@@ -106,6 +110,32 @@ configurations:
 Gibst du also nur `grid.columns` an, nutzt der Ausschnitt automatisch die
 volle Höhe; lässt du `span` weg, reicht er von der Position bis zum
 Rasterrand.
+
+### Monitor-spezifische Konfigurationen
+
+Standardmäßig erscheint jede Konfiguration auf jedem Monitor. Mit dem
+optionalen Feld `displays` lässt sich eine Konfiguration auf bestimmte
+Monitore beschränken — sie taucht dann nur im Menü auf, wenn du es auf einem
+dieser Monitore öffnest.
+
+Als Kennung dient die stabile Monitor-UUID (überlebt Neustart und Umstecken).
+Du bekommst sie per Klick auf die oberste Menü-Zeile („Monitor: …"): die
+Kennung landet in der Zwischenablage, der Monitorname wird als Kommentar
+angehängt, damit die Datei lesbar bleibt.
+
+```yaml
+configurations:
+  - name: Nur Ultrawide
+    displays:
+      - "37D8832A-2D66-02CA-B9F7-8F30A301B230"  # DELL U2720Q
+    grid:
+      columns: 2
+    position:
+      column: 0
+```
+
+Fehlt `displays` oder ist die Liste leer, gilt die Konfiguration wie bisher
+für alle Monitore.
 
 ## Aus dem Quellcode bauen
 
